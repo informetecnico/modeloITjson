@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vista de PDF desde FastAPI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(to right, #2c3e50, #4ca1af);
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        
+        .accordion {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .accordion-header {
+            padding: 20px;
+            background: linear-gradient(to right, #3498db, #2980b9);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.3s ease;
+        }
+        
+        .accordion-header:hover {
+            background: linear-gradient(to right, #2980b9, #2573a7);
+        }
+        
+        .accordion-header h3 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .accordion-icon {
+            transition: transform 0.3s ease;
+        }
+        
+        .accordion-icon.rotated {
+            transform: rotate(180deg);
+        }
+        
+        .accordion-content {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .accordion-content.open {
+            padding: 20px;
+            max-height: 500px;
+        }
+        
+        .json-input-container {
+            margin-top: 15px;
+        }
+        
+        .json-input-container label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .json-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+        
+        .json-input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        .json-input.valid {
+            border-color: #27ae60;
+        }
+        
+        .json-input.invalid {
+            border-color: #e74c3c;
+        }
+        
+        .json-validation {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .json-validation.valid {
+            color: #27ae60;
+        }
+        
+        .json-validation.invalid {
+            color: #e74c3c;
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #f1f8ff;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background-color: #2ecc71;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #27ae60;
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .pdf-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            min-height: 600px;
+            background-color: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .pdf-header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .pdf-viewer {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .pdf-pages {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .pdf-page {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            background: white;
+            max-width: 100%;
+        }
+        
+        .pdf-page img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .page-info {
+            text-align: center;
+            padding: 8px;
+            background: #f8f9fa;
+            border-top: 1px solid #ddd;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .pdf-placeholder {
+            text-align: center;
+            color: #7f8c8d;
+            padding: 40px;
+        }
+        
+        .pdf-placeholder i {
+            font-size: 4rem;
+            margin-bottom: 15px;
+            color: #bdc3c7;
+        }
+        
+        .status {
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            border-top: 1px solid #eee;
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .pdf-container {
+                min-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Visualizador de PDF - FastAPI</h1>
+            <p class="subtitle">Consulta y visualiza documentos PDF desde FastAPI</p>
+        </header>
+        
+        <div class="content">
+            <div class="accordion">
+                <div class="accordion-header" id="accordionHeader">
+                    <h3>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zM7 11.5a.5.5 0 0 1-1 0V6.707L5.354 7.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1-.708.708L7 6.707V11.5z"/>
+                        </svg>
+                        Configuración de la API FastAPI
+                    </h3>
+                    <svg class="accordion-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+                    </svg>
+                </div>
+                <div class="accordion-content" id="accordionContent">
+                    <p>Modifica el JSON que se enviará en la solicitud POST a la API:</p>
+                    
+                    <div class="json-input-container">
+                        <label for="jsonData">Datos JSON para enviar:</label>
+                        <textarea 
+                            id="jsonData" 
+                            class="json-input" 
+                            placeholder='{
+  "additionalProp1": {}
+}'>{
+  "additionalProp1": {}
+}</textarea>
+                        <div id="jsonValidation" class="json-validation">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                            </svg>
+                            JSON válido
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <div>
+                    <button id="reloadPdf" class="btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                        </svg>
+                        Recargar PDF
+                    </button>
+                </div>
+                <div>
+                    <button id="downloadPdf" class="btn btn-primary" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                            <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                        </svg>
+                        Descargar PDF
+                    </button>
+                </div>
+                <div>
+                    <button id="openWebsite" class="btn btn-secondary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/>
+                            <path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/>
+                        </svg>
+                        Abrir Sitio Web
+                    </button>
+                </div>
+            </div>
+            
+            <div class="status" id="statusMessage"></div>
+            
+            <div class="loading" id="loadingIndicator">
+                <div class="spinner"></div>
+                <p>Cargando PDF desde la API...</p>
+            </div>
+            
+            <div class="pdf-container">
+                <div class="pdf-header">
+                    <span>Vista Previa del PDF</span>
+                    <span id="pdfInfo">Cargando documento...</span>
+                </div>
+                <div class="pdf-viewer" id="pdfViewer">
+                    <div class="pdf-placeholder">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
+                        </svg>
+                        <h3>Cargando PDF...</h3>
+                        <p>Obteniendo documento desde la API</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Visualizador de PDF &copy; 2023 - Compatible con FastAPI</p>
+        </footer>
+    </div>
+
+    <!-- Incluir pdf.js desde CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script>
+        // Configurar pdf.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const reloadPdfBtn = document.getElementById('reloadPdf');
+            const downloadPdfBtn = document.getElementById('downloadPdf');
+            const openWebsiteBtn = document.getElementById('openWebsite');
+            const jsonDataInput = document.getElementById('jsonData');
+            const jsonValidation = document.getElementById('jsonValidation');
+            const accordionHeader = document.getElementById('accordionHeader');
+            const accordionContent = document.getElementById('accordionContent');
+            const accordionIcon = document.querySelector('.accordion-icon');
+            const pdfViewer = document.getElementById('pdfViewer');
+            const statusMessage = document.getElementById('statusMessage');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const pdfInfo = document.getElementById('pdfInfo');
+            
+            let currentPdfBlob = null;
+            let currentPdfDoc = null;
+            let currentJsonData = {
+                additionalProp1: {}
+            };
+            let isAccordionOpen = false;
+            let totalPages = 0;
+            
+            // URL de la API FastAPI
+            // const apiUrl = 'http://127.0.0.1:8000/__A/__A/__A00_a/f';
+            const apiUrl = 'https://doctec.duckdns.org/fast/__A/__A/__A00_a/f';
+            // const apiUrl = 'http://127.0.0.1:8000/A5_Medida_de_ahorro_energético/A52_Residencial/RES091_Hibridación_en_modo_paralelo_de_caldera_s_de_combustión_con_bomba_de_calor_de_accionamiento_eléctrico_en_edificios_residenciales_ubicados_en_la_zona_climática_B3_o_B4/f';
+            
+            // Configurar acordeón
+            accordionHeader.addEventListener('click', toggleAccordion);
+            
+            // Validar JSON en tiempo real
+            jsonDataInput.addEventListener('input', validateJson);
+            
+            // Configurar botón de abrir sitio web
+            openWebsiteBtn.addEventListener('click', function() {
+                window.open('https://informetecnico.github.io/', '_blank');
+            });
+            
+            // Cargar el PDF automáticamente al abrir la página
+            window.addEventListener('load', function() {
+                fetchPdf();
+            });
+            
+            reloadPdfBtn.addEventListener('click', fetchPdf);
+            downloadPdfBtn.addEventListener('click', downloadPdf);
+            
+            function toggleAccordion() {
+                isAccordionOpen = !isAccordionOpen;
+                
+                if (isAccordionOpen) {
+                    accordionContent.classList.add('open');
+                    accordionIcon.classList.add('rotated');
+                } else {
+                    accordionContent.classList.remove('open');
+                    accordionIcon.classList.remove('rotated');
+                }
+            }
+            
+            function validateJson() {
+                try {
+                    const jsonText = jsonDataInput.value.trim();
+                    if (jsonText === '') {
+                        jsonDataInput.classList.remove('valid', 'invalid');
+                        jsonValidation.className = 'json-validation';
+                        jsonValidation.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg> JSON válido';
+                        return true;
+                    }
+                    
+                    const parsedJson = JSON.parse(jsonText);
+                    currentJsonData = parsedJson;
+                    
+                    jsonDataInput.classList.remove('invalid');
+                    jsonDataInput.classList.add('valid');
+                    jsonValidation.className = 'json-validation valid';
+                    jsonValidation.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg> JSON válido';
+                    return true;
+                } catch (error) {
+                    jsonDataInput.classList.remove('valid');
+                    jsonDataInput.classList.add('invalid');
+                    jsonValidation.className = 'json-validation invalid';
+                    jsonValidation.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg> Error en JSON: ${error.message}`;
+                    return false;
+                }
+            }
+            
+            function fetchPdf() {
+                // Validar JSON antes de enviar
+                if (!validateJson()) {
+                    showStatus('Error: El JSON no es válido. Corrige los errores antes de enviar.', 'error');
+                    return;
+                }
+                
+                // Mostrar indicador de carga
+                loadingIndicator.style.display = 'block';
+                statusMessage.className = 'status';
+                reloadPdfBtn.disabled = true;
+                pdfInfo.textContent = 'Cargando documento...';
+                
+                // Configurar la solicitud
+                const requestOptions = {
+                    method: 'POST',
+                    headers: {
+                        'accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(currentJsonData)
+                };
+                
+                // Realizar la solicitud a la API FastAPI
+                fetch(apiUrl, requestOptions)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Error HTTP: ${response.status}`);
+                        }
+                        return response.blob(); // Obtener el PDF como blob binario
+                    })
+                    .then(blob => {
+                        if (blob.type === 'application/pdf') {
+                            currentPdfBlob = blob;
+                            return renderPdfAsImages(blob);
+                        } else {
+                            throw new Error('La respuesta no es un PDF válido');
+                        }
+                    })
+                    .then(() => {
+                        showStatus('PDF cargado correctamente desde FastAPI', 'success');
+                        downloadPdfBtn.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('Error al obtener el PDF:', error);
+                        showStatus(`Error: ${error.message}`, 'error');
+                        pdfInfo.textContent = 'Error al cargar el documento';
+                        
+                        // Mostrar mensaje de error en el visor
+                        pdfViewer.innerHTML = `
+                            <div class="pdf-placeholder">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="currentColor" viewBox="0 0 16 16" style="color: #e74c3c;">
+                                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                                </svg>
+                                <h3>Error al cargar el PDF</h3>
+                                <p>${error.message}</p>
+                                <p>Haz clic en "Recargar PDF" para intentar nuevamente</p>
+                            </div>
+                        `;
+                    })
+                    .finally(() => {
+                        loadingIndicator.style.display = 'none';
+                        reloadPdfBtn.disabled = false;
+                    });
+            }
+            
+            async function renderPdfAsImages(blob) {
+                try {
+                    // Convertir blob a ArrayBuffer
+                    const arrayBuffer = await blob.arrayBuffer();
+                    
+                    // Cargar el PDF con pdf.js
+                    const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    currentPdfDoc = pdfDoc;
+                    totalPages = pdfDoc.numPages;
+                    
+                    // Renderizar todas las páginas
+                    await renderAllPages(pdfDoc);
+                    
+                } catch (error) {
+                    console.error('Error al renderizar PDF:', error);
+                    throw new Error('No se pudo renderizar el PDF como imágenes');
+                }
+            }
+            
+            async function renderAllPages(pdfDoc) {
+                const pagesContainer = document.createElement('div');
+                pagesContainer.className = 'pdf-pages';
+                
+                // Renderizar cada página
+                for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                    const page = await pdfDoc.getPage(pageNum);
+                    
+                    // Configurar el viewport para una buena calidad
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    
+                    // Crear canvas
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    // Renderizar página en el canvas
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+                    
+                    // Convertir canvas a imagen
+                    const imgData = canvas.toDataURL('image/png');
+                    
+                    // Crear contenedor de página
+                    const pageContainer = document.createElement('div');
+                    pageContainer.className = 'pdf-page';
+                    
+                    const img = document.createElement('img');
+                    img.src = imgData;
+                    img.alt = `Página ${pageNum} del PDF`;
+                    
+                    const pageInfo = document.createElement('div');
+                    pageInfo.className = 'page-info';
+                    pageInfo.textContent = `Página ${pageNum} de ${totalPages}`;
+                    
+                    pageContainer.appendChild(img);
+                    pageContainer.appendChild(pageInfo);
+                    pagesContainer.appendChild(pageContainer);
+                }
+                
+                // Limpiar y mostrar las páginas
+                pdfViewer.innerHTML = '';
+                pdfViewer.appendChild(pagesContainer);
+                pdfInfo.textContent = `Documento cargado - ${totalPages} página(s) - ${new Date().toLocaleTimeString()}`;
+            }
+            
+            function downloadPdf() {
+                if (currentPdfBlob) {
+                    const url = URL.createObjectURL(currentPdfBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'estudio_coche_electrico_vs_diesel.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showStatus('PDF descargado correctamente', 'success');
+                }
+            }
+            
+            function showStatus(message, type) {
+                statusMessage.textContent = message;
+                statusMessage.className = `status ${type}`;
+                
+                // Ocultar el mensaje después de 5 segundos
+                setTimeout(() => {
+                    statusMessage.className = 'status';
+                }, 5000);
+            }
+            
+            // Validar JSON inicial
+            validateJson();
+        });
+    </script>
+</body>
+</html>
+
+
